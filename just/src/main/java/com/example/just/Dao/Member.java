@@ -31,6 +31,13 @@
 
       private String provider;
 
+      //신고받은횟수
+      @Column(name = "blamed_count")
+      private int blamedCount;
+      //신고한 횟수
+      @Column(name = "blame_count")
+      private int blameCount;
+
       @OneToMany(mappedBy = "member")
       @JsonIgnore
       private List<Post> posts = new ArrayList<>();
@@ -61,6 +68,13 @@
       private List<Notification> notifications;
       public void updateMember(final Post post) {
           posts.add(post);
+      }
+
+      public void addBlamed(){
+          blamedCount++;
+      }
+      public void addBlame(){
+          blameCount++;
       }
   }
 

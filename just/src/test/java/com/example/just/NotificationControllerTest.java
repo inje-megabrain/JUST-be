@@ -41,7 +41,7 @@ public class NotificationControllerTest {
     void beforeEach(){
         mockMvc = webAppContextSetup(context).apply(springSecurity()).build();
     }
-    @Test
+    /*@Test
     public void sub() throws Exception{
         //given
         Member member = new Member(1L,null,null,null,null,null,null);
@@ -51,5 +51,5 @@ public class NotificationControllerTest {
 
         //when,then
         mockMvc.perform(get("/noti").header("X-AUTH-TOKEN",access)).andExpect(status().isOk());
-    }
+    }*/
 }

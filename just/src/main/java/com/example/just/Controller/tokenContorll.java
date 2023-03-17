@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.io.IOException;
 
 @RestController
-@RequestMapping("/member")
+@RequestMapping("/api")
 public class tokenContorll {
     @Autowired
     KakaoService ks;
@@ -23,7 +23,7 @@ public class tokenContorll {
     }
 
     @GetMapping("/kakao")
-    public ResponseEntity getCI(@RequestParam String code, Model model) throws IOException{
+    public ResponseEntity getCI(@RequestParam String code) throws IOException{
         return ks.getToken(code);
     }
 }

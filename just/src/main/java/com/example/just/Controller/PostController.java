@@ -19,7 +19,6 @@ import javax.servlet.http.HttpServletRequest;
 
 @RequestMapping("/api")
 @RestController
-
 public class PostController {
 
     @Autowired
