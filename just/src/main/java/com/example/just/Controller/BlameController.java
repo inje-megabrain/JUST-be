@@ -14,13 +14,13 @@ public class BlameController {
     @Autowired
     private BlameService blameService;
 
-    @ApiOperation(value = "게시글 신고 API")
+    @ApiOperation(value = "게시글 신고 API" ,notes = "access_token으로 헤더에 넣어줘야 헤더값을 읽고 사용자판별가능")
     @PostMapping(value = "/blame/post/{target_post_id}")
     public ResponseEntity writepostBlame(HttpServletRequest request, @PathVariable Long target_post_id){
         return blameService.writeBlame(request,target_post_id,"post");
     }
 
-    @ApiOperation(value = "댓글 신고 API")
+    @ApiOperation(value = "댓글 신고 API",notes = "access_token으로 헤더에 넣어줘야 헤더값을 읽고 사용자판별가능")
     @PostMapping(value = "/blame/comment/{target_comment_id}")
     public ResponseEntity writeCommentBlame(HttpServletRequest request, @PathVariable Long target_comment_id){
         return blameService.writeBlame(request,target_comment_id,"comment");
