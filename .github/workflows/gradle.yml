@@ -21,8 +21,6 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    env:
-      working-directory: ./
 
     steps:
       - uses: actions/checkout@v3
@@ -37,8 +35,8 @@ jobs:
         uses: actions/cache@v2
         with:
           path: |
-            ~/just/.gradle/caches
-            ~/just/.gradle/wrapper
+            ./just/.gradle/caches
+            ./just/.gradle/wrapper
           key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
           restore-keys: |
             ${{ runner.os }}-gradle-    
@@ -48,6 +46,8 @@ jobs:
 
       - name: Setup Gradle
         uses: gradle/gradle-build-action@v2
-    
-      - name: Execute Gradle build
-        run: ./just/gradlew build
+        with:
+          arguments: build
+          build-root-directory: ./just
+          gradle-executable: ./just/gradlew
+
