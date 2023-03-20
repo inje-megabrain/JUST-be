@@ -26,7 +26,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @ActiveProfiles("test")
 @Transactional
 public class NotificationControllerTest {
-    @Autowired
+    /*@Autowired
     WebApplicationContext context;
     @Autowired
     MockMvc mockMvc;
@@ -41,7 +41,7 @@ public class NotificationControllerTest {
     void beforeEach(){
         mockMvc = webAppContextSetup(context).apply(springSecurity()).build();
     }
-    /*@Test
+    @Test
     public void sub() throws Exception{
         //given
         Member member = new Member(1L,null,null,null,null,null,null);
