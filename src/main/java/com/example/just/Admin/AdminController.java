@@ -22,6 +22,8 @@ import org.springframework.web.bind.annotation.*;
 import com.example.just.Service.MemberService;
 import com.example.just.Service.CommentService;
 import com.example.just.Service.PostService;
+
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -42,19 +44,25 @@ public class AdminController {
     private CommentRepository commentRepository;
     @Autowired
     private MemberRepository memberRepository;
-
-
-    @Autowired
-    private PostRepository postRepository;
     @Autowired
     private HashTagRepository hashTagRepository;
 
-    @ApiOperation(value = "멤버 리스트 불러옴 admin페이지에서 members 페이지로 이동할때")
-    @Operation(summary = "members리스트 뽑는다", description = "\n admin페이지->members페이지-> 리스트 리턴")
+    @ApiOperation(value = "멤버 리스트 불러옴 admin 페이지에서 members 페이지로 이동할때")
+    @Operation(summary = "members 리스트 뽑는다", description = "\n admin 페이지->members 페이지-> 리스트 리턴")
     @GetMapping("/members")
     public ResponseEntity<List<Member>> memberList() {
         List<Member> members = memberService.findMembers();
         return new ResponseEntity<>(members, HttpStatus.OK);
+    }
+
+
+    @ApiOperation(value = "신고받은 멤버 조회")
+    @Operation(summary = "신고받은 멤버 조회", description = "\n 신고받은 횟수가 0보다 큰 멤버 조회")
+    @GetMapping("/reported-members")
+    public ResponseEntity<List<Member>> getReportedMembers() {
+        List<Member> reportedMembers = memberRepository.findByBlamedCountGreaterThanEqualOrderByBlamedCountDesc(1);
+        // 여기서 1은 신고받은 횟수가 1 이상인 멤버만 조회하도록 설정한 예시입니다.
+        return new ResponseEntity<>(reportedMembers, HttpStatus.OK);
     }
 
 
@@ -69,8 +77,8 @@ public class AdminController {
         return new ResponseEntity<>("해당 회원이 존재하지 않습니다.", HttpStatus.BAD_REQUEST);
     }
 
-    @ApiOperation(value = "comments페이지에서 comment 리스트 불러옴")
-    @Operation(summary = "comments리스트", description = "\n admin페이지 -> comments->페이지로 return하여 리스트 뽑")
+    @ApiOperation(value = "comments 페이지에서 comment 리스트 불러옴")
+    @Operation(summary = "comments 리스트", description = "\n admin 페이지 -> comments->페이지로 return 하여 리스트 뽑")
     @GetMapping("/comments")
     public ResponseEntity<List<Comment>> commentList() {
         List<Comment> comments = commentService.getAllComments();
@@ -86,17 +94,15 @@ public class AdminController {
                 .orElseThrow(() -> new RuntimeException("부모 댓글이 존재하지 않습니다."));
         List<Comment> children = comment.getChildren();
         if (children != null) {
-            for (Comment child : children) {
-                commentRepository.delete(child);
-            }
+            commentRepository.deleteAll(children);
         }
         commentRepository.deleteById(comment_id);
         return ResponseEntity.ok("ok");
     }
 
 
-    @ApiOperation(value = "게시물 리스트 불러옴 posts페이지에서")
-    @Operation(summary = "게시글 리스트", description = "\n admin 페이지-> posts페이지-> return하여 post list 출력")
+    @ApiOperation(value = "게시물 리스트 불러옴 posts 페이지에서")
+    @Operation(summary = "게시글 리스트", description = "\n admin 페이지-> posts 페이지-> return 하여 post list 출력")
     @GetMapping("/posts")
     public ResponseEntity<List<Post>> postList() {
         List<Post> posts = postService.getAllPostList();
@@ -113,11 +119,11 @@ public class AdminController {
         ResponsePost responsePost = new ResponsePost(post_id, "삭제 완료");
         return responsePost;
     }
-/*
+
     @ApiOperation(value = "포스트페이지 해시태그 수정 ")
     @Operation(summary = "해시태그 수정", description = "\n hashtag_id 헤더로 받고 내용을 수정하면 새로운 해시태그를 생성하여 저장 ex) id_101 -> id_104로")
-    @PutMapping("/posts/{hashtag_id}")
-    public ResponseEntity<?> updateHashtags(@PathVariable Long hashtag_id, @RequestBody List<String> newHashtags)
+    @PutMapping("/hashtags/{hashtag_id}")
+    public ResponseEntity<?> updateHashtags(@PathVariable Long hashtag_id, @RequestBody List<String> updatedHashtags)
             throws NotFoundException {
         Optional<HashTag> optionalHashtag = hashTagRepository.findById(hashtag_id);
 
@@ -126,32 +132,16 @@ public class AdminController {
         }
 
         HashTag existingHashtag = optionalHashtag.get();
-        Post post = existingHashtag.getPost();
+        existingHashtag.setTags(updatedHashtags); // 여기서 수정
 
-        // 기존 게시물의 해시태그 제거
-        List<HashTag> existingHashtags = hashTagRepository.findByPost(post);
-        for (HashTag hashtag : existingHashtags) {
-            hashTagRepository.deleteById(hashtag.getId());
-        }
+        hashTagRepository.save(existingHashtag);
 
-        // 새로운 해시태그를 생성 저장
-        List<HashTag> updatedHashtags = newHashtags.stream()
-                .map(name -> {
-                    HashTag hashtag = new HashTag();
-                    hashtag.setName(name);
-                    hashtag.setPost(post);
-                    return hashtag;
-                })
-                .collect(Collectors.toList());
-
-        hashTagRepository.saveAll(updatedHashtags);
-
-        // 업데이트된 정보 DTO 반환
-        ResponseUpdateHashtagsDto response = new ResponseUpdateHashtagsDto(hashtag_id, newHashtags);
+        // 업데이트된 정보를 포함한 응답 DTO 반환
+        ResponseUpdateHashtagsDto response = new ResponseUpdateHashtagsDto(hashtag_id, Collections.singletonList(existingHashtag.getName()));
         return ResponseEntity.ok(response);
     }
 
-*/
+
 }
 
 
