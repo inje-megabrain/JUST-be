@@ -4,6 +4,7 @@ import com.example.just.Dao.Comment;
 import com.example.just.Dao.HashTag;
 import com.example.just.Dao.Member;
 import com.example.just.Dao.Post;
+import com.example.just.Repository.HashTagMapRepository;
 import com.example.just.Response.ResponseUpdateHashtagsDto;
 import com.example.just.Repository.CommentRepository;
 import com.example.just.Repository.HashTagRepository;
@@ -46,6 +47,8 @@ public class AdminController {
     private MemberRepository memberRepository;
     @Autowired
     private HashTagRepository hashTagRepository;
+    @Autowired
+    private HashTagMapRepository hashTagMapRepository;
 
     @ApiOperation(value = "멤버 리스트 불러옴 admin 페이지에서 members 페이지로 이동할때")
     @Operation(summary = "members 리스트 뽑는다", description = "\n admin 페이지->members 페이지-> 리스트 리턴")

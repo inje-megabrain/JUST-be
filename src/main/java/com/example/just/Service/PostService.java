@@ -2,17 +2,22 @@ package com.example.just.Service;
 
 
 import com.example.just.Dao.HashTag;
+import com.example.just.Dao.HashTagMap;
 import com.example.just.Dao.Member;
 import com.example.just.Dao.Post;
 
 
 import com.example.just.Dao.QBlame;
 import com.example.just.Dao.QPost;
+import com.example.just.Document.HashTagDocument;
 import com.example.just.Document.PostDocument;
 import com.example.just.Dto.GptRequestDto;
 import com.example.just.Dto.PostPostDto;
 import com.example.just.Dto.PutPostDto;
 import com.example.just.Repository.BlameRepository;
+
+import com.example.just.Repository.HashTagESRepository;
+import com.example.just.Repository.HashTagMapRepository;
 import com.example.just.Response.ResponseGetMemberPostDto;
 import com.example.just.Response.ResponseGetPostDto;
 import com.example.just.Response.ResponsePutPostDto;
@@ -23,16 +28,27 @@ import com.example.just.Repository.PostContentESRespository;
 import com.example.just.Repository.PostRepository;
 
 import com.example.just.jwt.JwtProvider;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.querydsl.core.types.dsl.Expressions;
 import com.querydsl.jpa.impl.JPAQueryFactory;
+import org.json.simple.JSONObject;
+import org.json.simple.parser.JSONParser;
+import org.json.simple.parser.ParseException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.crossstore.ChangeSetPersister.NotFoundException;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import javax.persistence.EntityManager;
 import java.util.*;
 import java.util.stream.Collectors;
+import org.springframework.web.client.RestTemplate;
 
 
 @Service
@@ -46,6 +62,9 @@ public class PostService {
     private MemberRepository memberRepository;
     @Autowired
     private HashTagRepository hashTagRepository;
+
+    @Autowired
+    private HashTagESRepository hashTagESRepository;
     @Autowired
     private BlameRepository blameRepository;
     @Autowired
@@ -58,6 +77,8 @@ public class PostService {
 
     @Autowired
     PostContentESRespository postContentESRespository;
+    @Autowired
+    private HashTagMapRepository hashTagMapRepository;
 
     public PostService(EntityManager em, JPAQueryFactory query) {
         this.em = em;
@@ -85,7 +106,7 @@ public class PostService {
     public PostPostDto write(Long member_id, PostPostDto postDto) {    //글 작성
         Member member = checkMember(member_id);
         Post post = new Post();
-
+        //해시태그가 NULL일 경우 Gpt로 해시태그 생성
         if (postDto.getHash_tag() == null) {
             String prompt = "";
             for (int i = 0; i < postDto.getPost_content().size(); i++) {
@@ -95,20 +116,52 @@ public class PostService {
             List<String> tag = gptService.getTag(gptRequestDto);
             postDto.setHash_tag(tag);
         }
+        List<String> content = new ArrayList<>();
+        for(int i = 0; i<postDto.getPost_content().size();i++){
+            content.add(getConvertString(postDto.getPost_content().get(i)));
+        }
+        postDto.setPost_content(content);
         post.writePost(postDto, member);
         Post p = postRepository.save(post);
+
+        List<String> hashTags = postDto.getHash_tag();
+        saveHashTag(hashTags, p);
+
+        PostDocument postDocument = new PostDocument(p);
         postContentESRespository.save(new PostDocument(p));
         return postDto;
     }
 
+    private void saveHashTag(List<String> hashTags, Post p) {
+        for (int i = 0; i < hashTags.size(); i++) {
+            HashTag hashTag = hashTagRepository.findByName(hashTags.get(i));
+            HashTagMap hashTagMap = new HashTagMap();
+            if (hashTag == null) {
+                HashTag newHashTag = new HashTag(hashTags.get(i));
+                newHashTag.setTagCount(1L);
+                newHashTag = hashTagRepository.save(newHashTag);
+                hashTagESRepository.save(new HashTagDocument(newHashTag));
+                hashTagMap = new HashTagMap(newHashTag, p); //객체 그래프 설정
+            } else {
+                hashTag.setTagCount(hashTag.getTagCount() + 1);
+                hashTagRepository.save(hashTag);
+                hashTagESRepository.save(new HashTagDocument(hashTag));
+                hashTagMap = new HashTagMap(hashTag, p); //객체 그래프 설정
+            }
+            hashTagMapRepository.save(hashTagMap);
+        }
+    }
+
+
     //글 삭제
     public void deletePost(Long post_id) throws NotFoundException {
         Post post = checkPost(post_id);
-        ResponsePost responsePost;
         if (post == null) {
             throw new NotFoundException();
         } else {
+            // Elasticsearch에서 해당 포스트의 내용 삭제
             postContentESRespository.deleteById(post_id);
+            deleteHashTag(post);
             postRepository.deleteById(post_id);
         }
     }
@@ -118,16 +171,46 @@ public class PostService {
         Long post_id = postDto.getPost_id();
         Member member = checkMember(member_id);
         Post checkPost = checkPost(post_id);
+        List<HashTagMap> hashTagMaps = checkPost.getHashTagMaps();
 
-       // List<HashTag> hashTags = hashTagRepository.findByPost(checkPost);
-    //    for (int i = 0; i < hashTags.size(); i++) {
-      //      hashTagRepository.deleteById(hashTags.get(i).getId());
-     //   }
+
+        deleteHashTag(checkPost);
+
+
+        List<String> content = new ArrayList<>();
+        for(int i = 0; i<postDto.getPost_content().size();i++){
+            content.add(getConvertString(postDto.getPost_content().get(i)));
+        }
+        postDto.setPost_content(content);
+
         checkPost.changePost(postDto, member, checkPost);
+
+
+        Post p = postRepository.save(checkPost);
+        saveHashTag(postDto.getHash_tage(), p);
+
         postContentESRespository.save(new PostDocument(checkPost));
-        postRepository.save(checkPost);
-        ResponsePutPostDto responsePutPostDto = new ResponsePutPostDto(checkPost);
+
+        ResponsePutPostDto responsePutPostDto = new ResponsePutPostDto(p);
         return responsePutPostDto;
+    }
+
+    private void deleteHashTag(Post post) {
+        List<HashTagMap> hashTagMaps = post.getHashTagMaps();
+        for (int i = 0; i < hashTagMaps.size(); i++) {
+            hashTagRepository.findById(hashTagMaps.get(i).getHashTag().getId())
+                    .ifPresent(
+                            hashTag -> {
+                                if (hashTag.getTagCount() != 1) {
+                                    hashTag.setTagCount(hashTag.getTagCount() - 1);
+                                    hashTagESRepository.save(new HashTagDocument(hashTag));
+                                    hashTagRepository.save(hashTag);
+                                } else {
+                                    hashTagESRepository.deleteById(hashTag.getId());
+                                    hashTagRepository.deleteById(hashTag.getId());
+                                }
+                            });
+        }
     }
 
     public List<Post> getAllPostList() {
@@ -177,7 +260,9 @@ public class PostService {
     private List<ResponseGetMemberPostDto> createResponseGetMemberPostDto(List<Post> results, Long member_id) {
         List<ResponseGetMemberPostDto> getPostDtos = new ArrayList<>();
         for (int i = 0; i < results.size(); i++) {
-            ResponseGetMemberPostDto responseGetMemberPostDto = new ResponseGetMemberPostDto(results, member_id, i);
+            List<HashTagMap> hashTagMaps = results.get(i).getHashTagMaps();
+            ResponseGetMemberPostDto responseGetMemberPostDto = new ResponseGetMemberPostDto(results, member_id, i,
+                    hashTagMaps);
             getPostDtos.add(responseGetMemberPostDto);
         }
         return getPostDtos;
@@ -213,13 +298,11 @@ public class PostService {
             postDocument.setPostLikeSize(postDocument.getPostLikeSize() + 1);
             responsePost = new ResponsePost(post_id, "좋아요 완료");
         }
-
         postContentESRespository.save(postDocument);
         Post savePost = postRepository.save(post);
 
         return ResponseEntity.ok(responsePost);
     }
-
 
     public ResponseGetPost searchByCursorMember(String cursor, Long limit, Long member_id) throws NotFoundException {
         QPost post = QPost.post;
@@ -245,9 +328,6 @@ public class PostService {
                 .from(blame)
                 .where(blame.blameMemberId.eq(realMember.getId()))
                 .fetch();
-
-        System.out.println(blames);
-        System.out.println(targetMembers);
         // 중복된 글을 제외하고 랜덤으로 limit+1개의 글을 가져옵니다.
         List<Post> results = query.select(post)
                 .from(post)
@@ -292,5 +372,38 @@ public class PostService {
         Collections.sort(results, Comparator.comparing(Post::getPost_create_time).reversed());
         List<ResponseGetMemberPostDto> getPostDtos = createResponseGetMemberPostDto(results, member_id);
         return getPostDtos;
+    }
+
+    public String getConvertString(String str){
+        RestTemplate restTemplate = new RestTemplate();
+
+        String requestBody = "{\"question\":\"" + str + "\",\"deny_list\":[\"string\"]}";
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.setAccept(Collections.singletonList(MediaType.APPLICATION_JSON));
+
+        HttpEntity<String> request = new HttpEntity<>(requestBody,headers);
+
+        ResponseEntity<String> responseEntity = restTemplate.exchange(
+                "http://203.241.228.51:8000/anonymize/",
+                HttpMethod.POST,
+                request,
+                String.class);
+
+        String responseBody = responseEntity.getBody();
+        String convertStr =parsingJson(responseBody);
+        return convertStr;
+    }
+
+    public String parsingJson(String json){
+        String response;
+        try {
+            JSONParser parser = new JSONParser();
+            JSONObject elem = (JSONObject) parser.parse(json);
+            response = elem.get("convertedQuestion").toString();
+        } catch (ParseException e) {
+            throw new RuntimeException(e);
+        }
+        return response;
     }
 }
