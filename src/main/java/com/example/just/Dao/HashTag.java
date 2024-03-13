@@ -52,6 +52,7 @@ public class HashTag {
         this.name = tagNames.get(0);
 =======
     @OneToMany(mappedBy = "hashTag", cascade = CascadeType.REMOVE)
+    @JsonIgnore
     private List<HashTagMap> hashTagMaps = new ArrayList<>();
 
 
