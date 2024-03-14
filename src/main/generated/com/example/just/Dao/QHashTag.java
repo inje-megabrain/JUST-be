@@ -26,8 +26,6 @@ public class QHashTag extends EntityPathBase<HashTag> {
 
     public final StringPath name = createString("name");
 
-    public final ListPath<Post, QPost> posts = this.<Post, QPost>createList("posts", Post.class, QPost.class, PathInits.DIRECT2);
-
     public final NumberPath<Long> tagCount = createNumber("tagCount", Long.class);
 
     public QHashTag(String variable) {
