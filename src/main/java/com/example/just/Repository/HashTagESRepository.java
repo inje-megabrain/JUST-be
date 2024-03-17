@@ -2,6 +2,9 @@ package com.example.just.Repository;
 
 import com.example.just.Document.HashTagDocument;
 import java.util.List;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.elasticsearch.repository.ElasticsearchRepository;
 import org.springframework.data.repository.CrudRepository;
